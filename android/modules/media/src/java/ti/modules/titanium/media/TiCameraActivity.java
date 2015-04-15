@@ -70,6 +70,9 @@ public class TiCameraActivity extends TiBaseActivity implements SurfaceHolder.Ca
 	public static int whichCamera = MediaModule.CAMERA_REAR;
 	public static int cameraFlashMode = MediaModule.CAMERA_FLASH_OFF;
 	public static boolean autohide = true;
+	public static List<Size> supportedPictureSizes;
+	public static Size desiredPictureSize;
+	public static Size targetPictureSize; // will be >= desiredPictureSize
 
 	private static class PreviewLayout extends FrameLayout
 	{
@@ -349,6 +352,9 @@ public class TiCameraActivity extends TiBaseActivity implements SurfaceHolder.Ca
 				param.setPictureSize(pictureSize.width, pictureSize.height);
 			}
 		}
+		if (this.targetPictureSize != null) {
+			param.setPictureSize(this.targetPictureSize.width, this.targetPictureSize.height);
+		}
 		camera.setParameters(param);
 
 		try {
@@ -507,6 +513,47 @@ public class TiCameraActivity extends TiBaseActivity implements SurfaceHolder.Ca
 		} else {
 			camera.takePicture(shutterCallback, null, jpegCallback);
 		}
+	}
+
+	static public List getSupportedPictureSizes()
+	{
+		List<Size> pictSizes = camera.getParameters().getSupportedPictureSizes();
+		this.supportedPictureSizes = pictSizes;
+		return pictSizes;
+	}
+
+	static public List setDesiredPictureSize(int width, int height)
+	{
+		if(this.supportedPictureSizes == null) {
+			this.getSupportedPictureSizes();
+		}
+
+		// sort sizes in ascending order
+		Collections.sort(this.supportedPictureSizes, new Comparator<Camera.Size>() {
+			public int compare(final Camera.Size a, final Camera.Size b) {
+				return a.width * a.height - b.width * b.height;
+			}
+		});
+
+		// loop through and grab the smallest supported size that is larger than the desired size
+		Camera.Size theClosestSupportedSize = null;
+		for (Camera.Size size : this.supportedPictureSizes) {
+			if (size.width >= width && size.height >= height && theClosestSupportedSize == null) {
+				theClosestSupportedSize=size;
+			}
+		}
+		if(theClosestSupportedSize == null) {
+			// desired was bigger than max size supported, to take the largest supported size
+			theClosestSupportedSize = this.supportedPictureSizes.get(this.supportedPictureSizes.size() - 1);
+		}
+
+		camera.parameters.setPictureSize(theClosestSupportedSize.width, theClosestSupportedSize.height);
+		this.targetSize = theClosestSupportedSize;
+	}
+
+	static public List getDesiredPictureSize()
+	{
+		return this.desiredPictureSize;
 	}
 
 	public boolean isPreviewRunning()
